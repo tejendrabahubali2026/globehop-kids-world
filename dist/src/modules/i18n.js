@@ -175,7 +175,17 @@ const EN = {
   funFact: 'Fun Fact',
   flyHere: 'Fly here',
   totalVisits: 'Total Visits',
-  uniqueVisitors: 'Unique Visitors'
+  uniqueVisitors: 'Unique Visitors',
+  communityTitle: 'Community Explorer Hub',
+  totalHops: 'Total Hops Taken',
+  tripsTaken: 'trips taken',
+  totalDistance: 'Total Distance Traveled',
+  distanceToMoon: '{n}× to the Moon!',
+  distanceAroundEarth: '{n}× around Earth!',
+  distanceJustStarting: 'Our journey is just beginning!',
+  trendingLandmarks: 'Top 3 Trending Landmarks',
+  topLandmarksEmpty: 'Be the first to explore an Indian landmark!',
+  hopsUnit: 'hops'
 };
 
 const STRINGS = {
@@ -233,7 +243,17 @@ const STRINGS = {
     funFact: 'रोचक तथ्य',
     flyHere: 'यहाँ उड़कर जाएँ',
     totalVisits: 'कुल विज़िट',
-    uniqueVisitors: 'अद्वितीय विज़िटर'
+    uniqueVisitors: 'अद्वितीय विज़िटर',
+    communityTitle: 'कम्युनिटी एक्सप्लोरर हब',
+    totalHops: 'कुल यात्राएँ',
+    tripsTaken: 'यात्राएँ हुईं',
+    totalDistance: 'कुल तय की गई दूरी',
+    distanceToMoon: 'चंद्रमा तक {n}× दूरी!',
+    distanceAroundEarth: 'पृथ्वी के चारों ओर {n}× चक्कर!',
+    distanceJustStarting: 'हमारी यात्रा अभी शुरू हुई है!',
+    trendingLandmarks: 'टॉप 3 लोकप्रिय स्थल',
+    topLandmarksEmpty: 'पहली भारतीय स्थल खोज आप करें!',
+    hopsUnit: 'बार'
   },
   bn: {
     ...EN,
