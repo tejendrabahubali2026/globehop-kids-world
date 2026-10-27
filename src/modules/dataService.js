@@ -70,6 +70,11 @@ export async function loadOrigins() {
   return fetchJson(dataUrl('origins/index.json'));
 }
 
+export async function loadIndianLandmarks() {
+  const payload = await fetchJson(dataUrl('indian-landmarks/index.json'));
+  return payload?.landmarks || [];
+}
+
 export async function getCountry(code2) {
   const index = await loadCountryIndex();
   const base = index.find((x) => x.code2 === code2?.toUpperCase());
