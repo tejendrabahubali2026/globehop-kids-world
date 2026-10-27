@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
