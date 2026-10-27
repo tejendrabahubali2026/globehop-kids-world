@@ -10,7 +10,7 @@ import {
 import { GlobeView } from './modules/globe.js';
 import { Globe3DView } from './modules/globe3d.js';
 import { resolveWikipediaImages } from './modules/wikiMedia.js';
-import { registerVisit } from './modules/analytics.js';
+import { registerVisit, recordHop, recordStateExplore } from './modules/analytics.js';
 import { aqiLabel, fetchCityInsights, weatherCodeLabel } from './modules/cityInsights.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -127,6 +127,26 @@ function renderAppShell() {
             <span class="explore-india-count" id="indiaLandmarkCount"></span>
           </div>
           <div class="explore-india-list" id="indiaLandmarkList" role="list"></div>
+          <div class="community-stats" id="communityStats" hidden>
+            <h3 class="community-title"><span aria-hidden="true">🏆</span> <span data-i18n="communityTitle"></span></h3>
+            <div class="community-grid">
+              <article class="community-metric">
+                <span class="metric-icon" aria-hidden="true">✈️</span>
+                <strong id="communityHops">—</strong>
+                <small id="communityHopsLabel"></small>
+              </article>
+              <article class="community-metric">
+                <span class="metric-icon" aria-hidden="true">🌕</span>
+                <strong id="communityDistance">—</strong>
+                <small id="communityDistanceFun"></small>
+              </article>
+              <article class="community-metric community-metric-wide">
+                <span class="metric-icon" aria-hidden="true">🥇</span>
+                <small class="metric-heading" data-i18n="trendingLandmarks"></small>
+                <ol class="trending-list" id="trendingLandmarks"></ol>
+              </article>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -339,6 +359,7 @@ function applyTranslations() {
   updateViewControls();
   globe3D?.setHelpText(t('globeInteractionHint'));
   renderExploreIndia();
+  if (latestCommunityStats) renderCommunityStats(latestCommunityStats);
   renderCurrentSelection();
   renderRecent();
 }
@@ -585,6 +606,62 @@ function flyToLandmark(lm) {
     active3D?.setSelectedCountry('IN');
     active3D?.focusPoint(lm.lat, lm.lon, { zoom: 1.5 });
   }
+  // Fire-and-forget community analytics: must never delay the animation above.
+  const distanceKm = state.origin ? haversineKm(state.origin, { lat: lm.lat, lon: lm.lon }) : 0;
+  recordHop({ landmarkId: lm.id, landmarkName: lm.name, stateName: lm.state, distanceKm })
+    .then((stats) => renderCommunityStats(stats))
+    .catch(() => {});
+}
+
+function stateCodeFromName(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+const MOON_DISTANCE_KM = 384400;
+const EARTH_CIRCUMFERENCE_KM = 40075;
+
+function distanceFunFact(km) {
+  if (km > MOON_DISTANCE_KM) {
+    return { icon: '🌕', text: t('distanceToMoon').replace('{n}', (km / MOON_DISTANCE_KM).toFixed(1)) };
+  }
+  if (km > EARTH_CIRCUMFERENCE_KM) {
+    return { icon: '🌍', text: t('distanceAroundEarth').replace('{n}', (km / EARTH_CIRCUMFERENCE_KM).toFixed(1)) };
+  }
+  return { icon: '🚀', text: t('distanceJustStarting') };
+}
+
+let latestCommunityStats = null;
+
+function renderCommunityStats(stats) {
+  const widget = $('#communityStats');
+  if (!widget || !stats || !Number.isFinite(Number(stats.total_hops))) return;
+  latestCommunityStats = stats;
+  const hops = Number(stats.total_hops) || 0;
+  const distance = Number(stats.total_distance_km) || 0;
+  $('#communityHops').textContent = formatNumber(hops);
+  $('#communityHopsLabel').textContent = t('tripsTaken');
+  $('#communityDistance').textContent = `${formatNumber(Math.round(distance))} km`;
+  const fun = distanceFunFact(distance);
+  const distanceFun = $('#communityDistanceFun');
+  distanceFun.textContent = `${fun.icon} ${fun.text}`;
+
+  const list = $('#trendingLandmarks');
+  const rows = Array.isArray(stats.top_landmarks) ? stats.top_landmarks.slice(0, 3) : [];
+  if (!rows.length) {
+    list.innerHTML = `<li class="trending-empty">${escapeHtml(t('topLandmarksEmpty'))}</li>`;
+  } else {
+    const medals = ['🥇', '🥈', '🥉'];
+    list.innerHTML = rows
+      .map((row, i) => {
+        const local = state.indianLandmarks.find((lm) => lm.id === row.landmark_id);
+        const emoji = local?.emoji || '📍';
+        const stateName = local?.state || row.state_name || '';
+        const name = local?.name || row.landmark_name || row.landmark_id;
+        return `<li class="trending-item"><span class="trending-medal" aria-hidden="true">${medals[i]}</span><span class="trending-emoji" aria-hidden="true">${escapeHtml(emoji)}</span><span class="trending-copy">${escapeHtml(name)}${stateName ? ` <em>(${escapeHtml(stateName)})</em>` : ''}</span><span class="trending-count">${formatNumber(row.click_count)} ${escapeHtml(t('hopsUnit'))}</span></li>`;
+      })
+      .join('');
+  }
+  widget.hidden = false;
 }
 
 function openLandmarkCard(lm) {
@@ -1211,6 +1288,7 @@ function bootVisitStats() {
       total.textContent = formatNumber(stats.total_visits);
       unique.textContent = formatNumber(stats.unique_visitors);
       bar.hidden = false;
+      renderCommunityStats(stats);
     })
     .catch(() => {});
 }
@@ -1710,6 +1788,12 @@ function wireEvents() {
   $('#indiaStateSelect').addEventListener('change', (event) => {
     state.indiaState = event.target.value;
     renderExploreIndia();
+    if (state.indiaState) {
+      // Fire-and-forget; never blocks the panel update.
+      recordStateExplore({ stateCode: stateCodeFromName(state.indiaState), stateName: state.indiaState })
+        .then((stats) => renderCommunityStats(stats))
+        .catch(() => {});
+    }
   });
   $('#exploreIndiaToggle').addEventListener('click', () => {
     state.indiaPanelOpen = !state.indiaPanelOpen;

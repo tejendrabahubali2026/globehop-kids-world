@@ -130,9 +130,11 @@ All external calls are optional: if a service is unreachable, the bundled data k
 The site records privacy-first traffic counters through a Cloudflare Pages Function backed by a D1 database bound as `DB` (`functions/api/stats.js`):
 
 - `POST /api/stats` — called once on app boot. Increments `total_visits`; increments `unique_visitors` only when the first-party `gh_vid` cookie is absent, then sets it for one year.
-- `GET /api/stats` — returns the current `{ total_visits, unique_visitors }` counters shown in the footer.
-- The D1 table `visit_stats` holds only those two integers. No names, emails, exact GPS coordinates, fingerprints or any personal data are collected, and no third-party analytics scripts are used.
-- The endpoint is optional: if Pages Functions or D1 are unavailable, the request fails silently and the counter bar stays hidden.
+- `POST /api/stats` with `action: "hop"` — fired (fire-and-forget, `keepalive`) whenever a user flies to an Indian landmark. Adds one to `total_hops`, adds the trip's great-circle distance in km to `total_distance_km` (capped per request), and upserts the landmark's `click_count` in `landmark_stats`.
+- `POST /api/stats` with `action: "explore_state"` — fired when a state/UT is chosen in the Explore India panel; upserts its `explore_count` in `state_stats`.
+- `GET /api/stats` — returns `{ total_visits, unique_visitors, total_hops, total_distance_km, top_landmarks, top_states }`; the top-3 leaderboard powers the Community Explorer Hub widget inside the Explore India panel, while the visit counters appear in the footer.
+- D1 tables (`visit_stats`, `community_stats`, `landmark_stats`, `state_stats`) are created automatically with `CREATE TABLE IF NOT EXISTS` and hold only integer counters plus public landmark/state identifiers. No names, emails, exact GPS coordinates, fingerprints or any personal data are collected, and no third-party analytics scripts are used.
+- Every activity call is asynchronous and non-blocking by design; invalid payloads and database errors are acknowledged with a soft HTTP 200 so the app experience is never affected. If Pages Functions or D1 are unavailable, the requests fail silently and the widgets stay hidden.
 
 ## Accessibility and privacy
 
