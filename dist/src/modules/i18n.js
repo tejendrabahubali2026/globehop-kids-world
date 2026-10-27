@@ -173,7 +173,9 @@ const EN = {
   landmarks: 'landmarks',
   landmarkBadge: 'Indian Landmark',
   funFact: 'Fun Fact',
-  flyHere: 'Fly here'
+  flyHere: 'Fly here',
+  totalVisits: 'Total Visits',
+  uniqueVisitors: 'Unique Visitors'
 };
 
 const STRINGS = {
@@ -229,7 +231,9 @@ const STRINGS = {
     landmarks: 'स्थल',
     landmarkBadge: 'भारतीय स्थलचिह्न',
     funFact: 'रोचक तथ्य',
-    flyHere: 'यहाँ उड़कर जाएँ'
+    flyHere: 'यहाँ उड़कर जाएँ',
+    totalVisits: 'कुल विज़िट',
+    uniqueVisitors: 'अद्वितीय विज़िटर'
   },
   bn: {
     ...EN,

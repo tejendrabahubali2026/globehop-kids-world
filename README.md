@@ -44,6 +44,8 @@ Departure cities are configured in [`src/data/origins/index.json`](src/data/orig
 ├─ 404.html                 # Standalone not-found page
 ├─ manifest.webmanifest     # PWA manifest
 ├─ sw.js                    # Service worker
+├─ functions/               # Cloudflare Pages Functions
+│  └─ api/stats.js          # Anonymous D1 visit-counter endpoint (/api/stats)
 ├─ public/                  # Static assets copied into the build output
 │  ├─ icons/
 │  ├─ 404.html
@@ -61,6 +63,7 @@ Departure cities are configured in [`src/data/origins/index.json`](src/data/orig
 │  │  ├─ storage.js         # localStorage helpers
 │  │  ├─ geo.js             # Distance, route and time calculations
 │  │  ├─ dataService.js     # Local data loading, search and external API helpers
+│  │  ├─ analytics.js       # Anonymous visit-counter client (fails soft offline)
 │  │  ├─ cityInsights.js    # Weather, air quality, Wikipedia/Wikidata city details
 │  │  ├─ globe.js           # Interactive 2D SVG world map
 │  │  ├─ globe3d.js         # WebGL 3D globe
@@ -122,12 +125,21 @@ Bundled data includes country facts, world geometries, featured places, a city i
 
 All external calls are optional: if a service is unreachable, the bundled data keeps the core exploration working.
 
+## Anonymous Analytics
+
+The site records privacy-first traffic counters through a Cloudflare Pages Function backed by a D1 database bound as `DB` (`functions/api/stats.js`):
+
+- `POST /api/stats` — called once on app boot. Increments `total_visits`; increments `unique_visitors` only when the first-party `gh_vid` cookie is absent, then sets it for one year.
+- `GET /api/stats` — returns the current `{ total_visits, unique_visitors }` counters shown in the footer.
+- The D1 table `visit_stats` holds only those two integers. No names, emails, exact GPS coordinates, fingerprints or any personal data are collected, and no third-party analytics scripts are used.
+- The endpoint is optional: if Pages Functions or D1 are unavailable, the request fails silently and the counter bar stays hidden.
+
 ## Accessibility and privacy
 
 - Semantic HTML, keyboard navigation, visible focus states and large touch targets.
 - `prefers-reduced-motion` support and alt text for images.
 - Automatic 2D fallback for browsers without WebGL.
-- The app has no backend of its own. Location coordinates are used only for route calculations and are not stored on any server.
+- Location coordinates are used only for client-side route calculations and are never stored on a server; the only server-side data is the anonymous visit counters described above.
 
 ## License
 

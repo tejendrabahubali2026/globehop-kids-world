@@ -10,6 +10,7 @@ import {
 import { GlobeView } from './modules/globe.js';
 import { Globe3DView } from './modules/globe3d.js';
 import { resolveWikipediaImages } from './modules/wikiMedia.js';
+import { registerVisit } from './modules/analytics.js';
 import { aqiLabel, fetchCityInsights, weatherCodeLabel } from './modules/cityInsights.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -258,6 +259,11 @@ function renderAppShell() {
         <span>Email - <a href="mailto:tejendrabahubali@outlook.com">tejendrabahubali@outlook.com</a></span>
         <span aria-hidden="true">|</span>
         <span>Website - <a href="https://tejendrabahubali2026.pagezapp.cc.cd/" target="_blank" rel="noreferrer">https://tejendrabahubali2026.pagezapp.cc.cd/</a></span>
+      </div>
+      <div class="visit-stats-bar" id="visitStatsBar" hidden>
+        <span class="visit-stat">🌍 <span data-i18n="totalVisits"></span>: <strong id="totalVisitsCount">—</strong></span>
+        <span aria-hidden="true">|</span>
+        <span class="visit-stat">👥 <span data-i18n="uniqueVisitors"></span>: <strong id="uniqueVisitorsCount">—</strong></span>
       </div>
       <div class="site-footer-meta">
         <span data-i18n="footer"></span>
@@ -613,7 +619,11 @@ function openLandmarkCard(lm) {
       <button class="primary-button" type="button" data-landmark-fly>${icon('location', 17)}<span>${escapeHtml(t('flyHere'))}</span></button>
       <button class="secondary-button" type="button" data-landmark-close>${escapeHtml(t('close'))}</button>
     </div>`;
-  root.querySelector('[data-landmark-fly]')?.addEventListener('click', () => flyToLandmark(lm));
+  root.querySelector('[data-landmark-fly]')?.addEventListener('click', () => {
+    // Close first so the fly-to animation (especially on mobile) is fully visible.
+    dialog.close();
+    flyToLandmark(lm);
+  });
   if (!dialog.open) dialog.showModal();
 }
 
@@ -1189,6 +1199,22 @@ function renderFavoriteState() {
   btn.setAttribute('aria-label', btn.title);
 }
 
+// Fire-and-forget anonymous analytics; the counters bar stays hidden on failure.
+function bootVisitStats() {
+  registerVisit()
+    .then((stats) => {
+      if (!stats) return;
+      const bar = $('#visitStatsBar');
+      const total = $('#totalVisitsCount');
+      const unique = $('#uniqueVisitorsCount');
+      if (!bar || !total || !unique) return;
+      total.textContent = formatNumber(stats.total_visits);
+      unique.textContent = formatNumber(stats.unique_visitors);
+      bar.hidden = false;
+    })
+    .catch(() => {});
+}
+
 function renderRecent() {
   const root = $('#recentStrip');
   if (!root) return;
@@ -1748,6 +1774,8 @@ async function init() {
   renderAppShell();
   renderLanguageSelect();
   setTheme(state.theme);
+  // Anonymous analytics: non-blocking, fails silently if Functions/D1 are absent.
+  bootVisitStats();
   const [geoms, index, places, origins, indianLandmarks] = await Promise.all([
     loadWorldGeometries(), loadCountryIndex(), loadPlaces(), loadOrigins(),
     loadIndianLandmarks().catch(() => [])
