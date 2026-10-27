@@ -42,8 +42,6 @@ GlobeHop_3D_COMPLETE_PROJECT/
 │  │  └─ storage.js
 │  ├─ app.js
 │  └─ styles.css
-├─ START_HERE.md
-├─ QA_REPORT.md
 ├─ index.html
 ├─ package.json
 └─ README.md

@@ -1,4 +1,4 @@
-const VERSION = 'globehop-v8-5-korea-tourism-20260819';
+const VERSION = 'globehop-kids-india-20261027';
 const CORE = [
   './', './index.html', './src/styles.css', './src/app.js',
   './src/modules/config.js', './src/modules/i18n.js', './src/modules/storage.js',
@@ -39,7 +39,7 @@ self.addEventListener('fetch', (event) => {
 
   if (url.origin !== self.location.origin) return;
 
-  // HTML/JS/CSS/JSON must update immediately after a GitHub Pages deployment.
+  // HTML/JS/CSS/JSON always refresh from the network so new deploys take effect immediately.
   const liveCode = url.pathname.endsWith('/') || /\.(?:html|js|css|json|webmanifest)$/.test(url.pathname);
   if (liveCode) {
     event.respondWith(

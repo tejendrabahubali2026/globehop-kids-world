@@ -1,7 +1,7 @@
 {
-  "name": "GlobeHop — Kids World Explorer",
-  "short_name": "GlobeHop",
-  "description": "Search countries and cities, travel across a kid-friendly globe, and learn basic world facts.",
+  "name": "GlobeHop Kids World",
+  "short_name": "GlobeHop Kids",
+  "description": "An interactive, educational globe for children to explore the world, customized for Indian students. Search countries and cities, travel across a kid-friendly globe, and learn basic world facts.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

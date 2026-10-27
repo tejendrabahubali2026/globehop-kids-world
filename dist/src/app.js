@@ -18,8 +18,13 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"]/g, (m) => ({ '&
 
 const requestedViewMode = new URLSearchParams(location.search).get('view');
 
+const initialLocale = (() => {
+  const stored = getStored('locale', null);
+  return APP.supportedLocales.includes(stored) ? stored : APP.defaultLocale;
+})();
+
 const state = {
-  locale: getStored('locale', navigator.language?.startsWith('ko') ? 'ko' : 'en'),
+  locale: initialLocale,
   theme: getStored('theme', 'system'),
   viewMode: ['map', 'globe'].includes(requestedViewMode) ? requestedViewMode : getStored('viewMode', 'globe'),
   tripType: getStored('tripType', 'oneway'),
@@ -225,7 +230,20 @@ function renderAppShell() {
       </section>
     </main>
 
-    <footer class="site-footer"><span data-i18n="footer"></span><span class="build-version" title="Zoom-aware cities, navigation memory, Korea tourism explorer">V8.5</span><button type="button" id="footerInfo" class="text-button" data-i18n="dataSources"></button></footer>
+    <footer class="site-footer">
+      <div class="dev-credit-bar">
+        <span>Dev- Tejendra Bahubali</span>
+        <span aria-hidden="true">|</span>
+        <span>Email - <a href="mailto:tejendrabahubali@outlook.com">tejendrabahubali@outlook.com</a></span>
+        <span aria-hidden="true">|</span>
+        <span>Website - <a href="https://tejendrabahubali2026.pagezapp.cc.cd/" target="_blank" rel="noreferrer">https://tejendrabahubali2026.pagezapp.cc.cd/</a></span>
+      </div>
+      <div class="site-footer-meta">
+        <span data-i18n="footer"></span>
+        <span class="build-version" title="GlobeHop Kids — India edition">V8.5</span>
+        <button type="button" id="footerInfo" class="text-button" data-i18n="dataSources"></button>
+      </div>
+    </footer>
 
     <dialog id="sourceDialog" class="source-dialog">
       <button class="dialog-close icon-button" type="button" data-dialog-close aria-label="Close">${icon('close')}</button>
@@ -262,7 +280,6 @@ function setOriginObject(origin) {
   state.origin = {
     ...origin,
     name: origin.names?.en || origin.name || origin.id,
-    nameKo: origin.names?.ko || origin.name || origin.id,
     source: origin.isCustom ? 'geolocation' : 'preset'
   };
 }
@@ -278,8 +295,8 @@ function renderOriginSelect() {
 
 function applyTranslations() {
   t = translator(state.locale);
-  document.documentElement.lang = state.locale === 'zh' ? 'zh-CN' : state.locale;
-  document.documentElement.dir = ['ar', 'ur', 'fa'].includes(state.locale) ? 'rtl' : 'ltr';
+  document.documentElement.lang = state.locale;
+  document.documentElement.dir = state.locale === 'ur' ? 'rtl' : 'ltr';
   $$('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
   $('#searchInput').placeholder = t('searchPlaceholder');
   $('#searchHint').textContent = t('searchHint');
@@ -385,7 +402,6 @@ function getDestinationTimezone() {
 function localizedCapitalName(country) {
   if (!country) return '';
   const point = state.mapPoints.find((p) => p.type === 'capital' && p.countryCode === country.code2);
-  if (state.locale === 'ko') return point?.nameKo || country.capital || '';
   return point?.name || country.capital || '';
 }
 
@@ -439,7 +455,7 @@ function updateInteractiveRoute({ focus3D = true } = {}) {
 function mapItemName(item) {
   if (!item?.data) return '';
   if (item.kind === 'country') return displayCountryName(item.data.code2, state.locale, item.data.name || item.data.code2);
-  return state.locale === 'ko' && item.data.nameKo ? item.data.nameKo : (item.data.name || item.data.nameKo || item.data.id);
+  return item.data.name || item.data.nameKo || item.data.id;
 }
 
 function mapItemSecondary(item) {
@@ -469,7 +485,7 @@ function showMapTooltip(item, position) {
   }
   const population = item.data.population ? `<span>👥 ${escapeHtml(formatCompact(item.data.population))}</span>` : '';
   const area = item.data.areaKm2 ? `<span>📐 ${escapeHtml(formatNumber(Math.round(item.data.areaKm2)))} km²</span>` : '';
-  const description = state.locale === 'ko' ? (item.data.descriptionKo || '') : (item.data.description || '');
+  const description = item.data.description || '';
   tooltip.innerHTML = `
     <strong>${escapeHtml(mapItemName(item))}</strong>
     <small>${escapeHtml(mapItemSecondary(item))}</small>
@@ -592,7 +608,7 @@ function updateDetailNavigation() {
 }
 
 function resultName(result) {
-  return result.displayName || result.localizedName || (state.locale === 'ko' ? result.nameKo : '') || result.name || result.nameKo || displayCountryName(result.code2 || result.countryCode, state.locale, result.name || result.country || '');
+  return result.displayName || result.localizedName || result.name || result.nameKo || displayCountryName(result.code2 || result.countryCode, state.locale, result.name || result.country || '');
 }
 
 function resultSecondary(result) {
@@ -605,12 +621,7 @@ function factCard(iconEmoji, label, value, source = '') {
 }
 
 function displayRegion(region) {
-  const map = {
-    ko: { Asia: '아시아', Europe: '유럽', Africa: '아프리카', Americas: '아메리카', Oceania: '오세아니아' },
-    ja: { Asia: 'アジア', Europe: 'ヨーロッパ', Africa: 'アフリカ', Americas: 'アメリカ大陸', Oceania: 'オセアニア' },
-    zh: { Asia: '亚洲', Europe: '欧洲', Africa: '非洲', Americas: '美洲', Oceania: '大洋洲' }
-  };
-  return map[state.locale]?.[region] || region || t('unavailable');
+  return region || t('unavailable');
 }
 
 function renderFacts() {
@@ -666,8 +677,8 @@ function formatCityLocalTime(timezone) {
 }
 
 function hemisphereLabel(lat, lon) {
-  const northSouth = Number(lat) >= 0 ? (state.locale === 'ko' ? '북반구' : 'Northern') : (state.locale === 'ko' ? '남반구' : 'Southern');
-  const eastWest = Number(lon) >= 0 ? (state.locale === 'ko' ? '동반구' : 'Eastern') : (state.locale === 'ko' ? '서반구' : 'Western');
+  const northSouth = Number(lat) >= 0 ? 'Northern' : 'Southern';
+  const eastWest = Number(lon) >= 0 ? 'Eastern' : 'Western';
   return `${northSouth} · ${eastWest}`;
 }
 
@@ -690,7 +701,7 @@ function renderCityInsights() {
     }
     const totalCities = state.countryMapCities?.length || cities.length;
     const koreaBadge = state.country?.code2 === 'KR' ? `<span class="korea-map-badge">🇰🇷 ${escapeHtml(t('koreaTourismMap'))}</span>` : '';
-    root.innerHTML = `<div class="country-city-directory"><div class="country-city-title-row"><h4>${escapeHtml(t('countryCities'))}</h4>${koreaBadge}</div><p>${escapeHtml(t('cityDirectoryNote'))}</p><p class="zoom-city-hint">🔎 ${escapeHtml(t('zoomCityHint'))} <strong>${escapeHtml(formatNumber(totalCities))}</strong></p><div class="country-city-grid">${cities.map((city, index) => `<button type="button" data-country-city-index="${index}"><span><strong>${escapeHtml(state.locale === 'ko' && city.nameKo ? city.nameKo : city.name)}</strong>${state.locale === 'ko' && city.nameKo ? `<small>${escapeHtml(city.name)}${city.admin1 ? ` · ${escapeHtml(city.admin1)}` : ''}</small>` : city.admin1 ? `<small>${escapeHtml(city.admin1)}</small>` : ''}</span>${city.population ? `<em>👥 ${escapeHtml(formatCompact(city.population))}</em>` : '<em>→</em>'}</button>`).join('')}</div></div><p class="city-source-note">GeoNames cities15000 · CC BY 4.0</p>`;
+    root.innerHTML = `<div class="country-city-directory"><div class="country-city-title-row"><h4>${escapeHtml(t('countryCities'))}</h4>${koreaBadge}</div><p>${escapeHtml(t('cityDirectoryNote'))}</p><p class="zoom-city-hint">🔎 ${escapeHtml(t('zoomCityHint'))} <strong>${escapeHtml(formatNumber(totalCities))}</strong></p><div class="country-city-grid">${cities.map((city, index) => `<button type="button" data-country-city-index="${index}"><span><strong>${escapeHtml(city.name)}</strong>${city.admin1 ? `<small>${escapeHtml(city.admin1)}</small>` : ''}</span>${city.population ? `<em>👥 ${escapeHtml(formatCompact(city.population))}</em>` : '<em>→</em>'}</button>`).join('')}</div></div><p class="city-source-note">GeoNames cities15000 · CC BY 4.0</p>`;
     $$('[data-country-city-index]', root).forEach((button) => button.addEventListener('click', () => {
       const city = cities[Number(button.dataset.countryCityIndex)];
       if (city) selectResult(city);
@@ -756,12 +767,12 @@ function renderCityInsights() {
   const galleryBlock = gallery.length ? `<div class="city-photo-tour"><div class="city-photo-tour-heading"><h4>${escapeHtml(t('cityPhotoGallery'))}</h4><div><button type="button" data-city-gallery="prev" aria-label="Previous photo">‹</button><button type="button" data-city-gallery="next" aria-label="Next photo">›</button></div></div><div class="city-photo-track" data-city-gallery-track>${gallery.map((photo, index) => `<figure class="city-photo-slide" data-city-photo-index="${index}"><img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.title || state.destination.name)}" loading="lazy" referrerpolicy="no-referrer"><figcaption><strong>${escapeHtml(photo.title || state.destination.name)}</strong>${photo.subtitle ? `<span>${escapeHtml(photo.subtitle)}</span>` : ''}</figcaption></figure>`).join('')}</div><div class="city-photo-dots">${gallery.map((_, index) => `<button type="button" data-city-photo-dot="${index}" aria-label="Photo ${index + 1}"></button>`).join('')}</div></div>` : '';
 
   let overview = '';
-  if (wiki?.extract || tourism?.summaryKo) {
-    const overviewText = state.locale === 'ko' && tourism?.summaryKo ? `${tourism.summaryKo} ${wiki?.extract || ''}`.trim() : (wiki?.extract || tourism?.summaryKo || '');
+  if (wiki?.extract) {
+    const overviewText = wiki.extract || '';
     overview = `<div class="city-overview-card${gallery.length ? ' city-overview-card-text' : ''}">${wiki.image && !gallery.length ? `<img src="${escapeHtml(wiki.image)}" alt="${escapeHtml(wiki.title || state.destination.name)}" loading="lazy" referrerpolicy="no-referrer">` : ''}<div><span class="city-subheading">${escapeHtml(t('cityOverview'))}</span><p>${escapeHtml(overviewText)}</p>${wiki?.url ? `<a href="${escapeHtml(wiki.url)}" target="_blank" rel="noreferrer">${escapeHtml(t('wikipediaSource'))} ↗</a>` : ''}</div></div>`;
   }
 
-  const tourismBlock = tourism ? `<div class="korea-tourism-block"><div class="korea-tourism-title"><span>🇰🇷</span><div><h4>${escapeHtml(t('tourismHighlights'))}</h4><p>${escapeHtml(tourism.summaryKo || '')}</p></div></div>${tourism.tags?.length ? `<div class="tourism-tags">${tourism.tags.map((tag) => `<span>#${escapeHtml(tag)}</span>`).join('')}</div>` : ''}<div class="tourism-highlight-grid">${tourismAttractions.map((place, index) => `<button type="button" class="tourism-highlight-card" data-tourism-index="${index}">${place.image?.src ? `<img src="${escapeHtml(place.image.src)}" alt="${escapeHtml(place.nameKo || place.name)}" loading="lazy" referrerpolicy="no-referrer">` : `<span class="tourism-image-fallback">📍</span>`}<span><strong>${escapeHtml(place.nameKo || place.name)}</strong><small>${escapeHtml(place.category || '')}</small><em>${escapeHtml(place.descriptionKo || '')}</em></span></button>`).join('')}</div></div>` : '';
+  const tourismBlock = tourism ? `<div class="korea-tourism-block"><div class="korea-tourism-title"><span>🇰🇷</span><div><h4>${escapeHtml(t('tourismHighlights'))}</h4></div></div><div class="tourism-highlight-grid">${tourismAttractions.map((place, index) => `<button type="button" class="tourism-highlight-card" data-tourism-index="${index}">${place.image?.src ? `<img src="${escapeHtml(place.image.src)}" alt="${escapeHtml(place.name)}" loading="lazy" referrerpolicy="no-referrer">` : `<span class="tourism-image-fallback">📍</span>`}<span><strong>${escapeHtml(place.name)}</strong></span></button>`).join('')}</div></div>` : '';
 
   const cityReferenceLinks = [
     wiki?.url ? `<a href="${escapeHtml(wiki.url)}" target="_blank" rel="noreferrer">Wikipedia ↗</a>` : '',
@@ -907,8 +918,7 @@ async function hydrateCityInsights() {
 }
 
 function famousPlacesForCurrentCountry() {
-  const localized = state.locale === 'ko' && state.knowledge?.ko ? state.knowledge.ko : state.knowledge;
-  const base = localized?.famousPlaces || state.knowledge?.famousPlaces || [];
+  const base = state.knowledge?.famousPlaces || [];
   if (base.length) return base;
   if (!state.country) return [];
   const countryName = displayCountryName(state.country.code2, state.locale, state.country.name);
@@ -932,11 +942,10 @@ function famousPlacesForCurrentCountry() {
 }
 
 function famousPlaceDisplayName(place) {
-  return state.locale === 'ko' ? (place.nameKo || place.name) : (place.name || place.nameKo);
+  return place.name || place.nameKo;
 }
 
 function famousPlaceDescription(place) {
-  if (state.locale === 'ko') return place.descriptionKo || place.description || '';
   return place.description || '';
 }
 
@@ -1006,7 +1015,7 @@ function renderKnowledge() {
     root.innerHTML = `<div class="knowledge-empty"><span aria-hidden="true">🧩</span><p>${escapeHtml(t('knowledgeFallback'))}</p></div><div class="overview-card"><strong>${escapeHtml(t('overview'))}</strong><p>${escapeHtml(fallbackOverview)}</p></div>`;
     return;
   }
-  const data = state.locale === 'ko' && k.ko ? k.ko : k;
+  const data = k;
   root.innerHTML = `
     <div class="overview-card"><strong>${escapeHtml(t('overview'))}</strong><p>${escapeHtml(data.overview || fallbackOverview)}</p></div>
     <div class="story-grid">
@@ -1143,7 +1152,7 @@ async function useLocation() {
     state.origin = {
       id: 'custom',
       isCustom: true,
-      names: { [state.locale]: t('originCustom'), en: 'My location', ko: '내 위치' },
+      names: { [state.locale]: t('originCustom'), en: 'My location' },
       lat: pos.coords.latitude,
       lon: pos.coords.longitude,
       countryCode: null,
@@ -1532,7 +1541,7 @@ function wireEvents() {
 
 async function loadSelectionFromLocation() {
   const params = new URLSearchParams(location.search);
-  const c = (params.get('c') || 'KR').toUpperCase();
+  const c = (params.get('c') || APP.defaultCountryCode).toUpperCase();
   if (params.get('lat') && params.get('lon')) {
     await selectResult({
       kind: 'place',
@@ -1546,7 +1555,7 @@ async function loadSelectionFromLocation() {
     }, { skipUrl: true });
     return;
   }
-  const countryRow = state.countryIndex.find((x) => x.code2 === c) || state.countryIndex.find((x) => x.code2 === 'KR');
+  const countryRow = state.countryIndex.find((x) => x.code2 === c) || state.countryIndex.find((x) => x.code2 === APP.defaultCountryCode);
   if (countryRow) await selectResult({ kind: 'country', ...countryRow, displayName: displayCountryName(countryRow.code2, state.locale, countryRow.name) }, { skipUrl: true });
 }
 
@@ -1574,8 +1583,8 @@ async function loadInitialSelection() {
       return;
     }
   }
-  const korea = state.countryIndex.find((row) => row.code2 === 'KR');
-  await selectResult({ kind: 'country', ...korea, displayName: displayCountryName('KR', state.locale, korea?.name || 'South Korea') }, { skipUrl: true });
+  const india = state.countryIndex.find((row) => row.code2 === APP.defaultCountryCode);
+  await selectResult({ kind: 'country', ...india, displayName: displayCountryName(APP.defaultCountryCode, state.locale, india?.name || 'India') }, { skipUrl: true });
   updateUrl('replace');
 }
 
@@ -1619,5 +1628,5 @@ async function init() {
 
 init().catch((error) => {
   console.error(error);
-  $('#app').innerHTML = '<main class="fatal-error"><span>🌍</span><h1>GlobeHop</h1><p>지도를 불러오지 못했습니다. 페이지를 새로고침해 주세요.</p><button onclick="location.reload()">새로고침</button></main>';
+  $('#app').innerHTML = '<main class="fatal-error"><span>🌍</span><h1>GlobeHop Kids</h1><p>We could not load the map. Please refresh the page to try again.</p><button onclick="location.reload()">Refresh</button></main>';
 });
