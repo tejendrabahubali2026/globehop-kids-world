@@ -1,10 +1,10 @@
-const VERSION = 'globehop-kids-india-20261027';
+const VERSION = 'globehop-kids-india-landmarks-20261027';
 const CORE = [
   './', './index.html', './src/styles.css', './src/app.js',
   './src/modules/config.js', './src/modules/i18n.js', './src/modules/storage.js',
   './src/modules/geo.js', './src/modules/dataService.js', './src/modules/cityInsights.js', './src/modules/globe.js', './src/modules/globe3d.js', './src/modules/wikiMedia.js',
   './src/data/countries/index.json', './src/data/world-geometries.json',
-  './src/data/places/index.json', './src/data/cities/index.json', './src/data/origins/index.json',
+  './src/data/places/index.json', './src/data/cities/index.json', './src/data/origins/index.json', './src/data/indian-landmarks/index.json',
   './favicon.svg', './manifest.webmanifest'
 ];
 

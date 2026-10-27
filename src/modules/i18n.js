@@ -164,7 +164,16 @@ const EN = {
   imageSourceNote: 'Landmark photos are loaded from Wikipedia/Wikimedia when available; each image keeps its original source license.',
   flag: 'Flag',
   landUnavailable: 'Hard to estimate',
-  hours: 'hours'
+  hours: 'hours',
+  exploreIndia: 'Explore India',
+  exploreIndiaHint: 'Choose a state or union territory to discover its famous landmarks.',
+  pickState: 'Select a state / UT',
+  hidePanel: 'Hide',
+  showPanel: 'Show',
+  landmarks: 'landmarks',
+  landmarkBadge: 'Indian Landmark',
+  funFact: 'Fun Fact',
+  flyHere: 'Fly here'
 };
 
 const STRINGS = {
@@ -211,7 +220,16 @@ const STRINGS = {
     recent: 'हाल की यात्राएँ',
     noRecent: 'अभी तक कोई यात्रा नहीं।',
     close: 'बंद करें',
-    footer: 'GlobeHop Kids · जिज्ञासु बच्चों के लिए विश्व अन्वेषक'
+    footer: 'GlobeHop Kids · जिज्ञासु बच्चों के लिए विश्व अन्वेषक',
+    exploreIndia: 'भारत खोजें',
+    exploreIndiaHint: 'प्रसिद्ध स्थल देखने के लिए कोई राज्य या केंद्र शासित प्रदेश चुनें।',
+    pickState: 'राज्य / केंद्र शासित प्रदेश चुनें',
+    hidePanel: 'छिपाएँ',
+    showPanel: 'दिखाएँ',
+    landmarks: 'स्थल',
+    landmarkBadge: 'भारतीय स्थलचिह्न',
+    funFact: 'रोचक तथ्य',
+    flyHere: 'यहाँ उड़कर जाएँ'
   },
   bn: {
     ...EN,

@@ -1,4 +1,21 @@
 const PREFIX = 'globehop:';
+const SCHEMA_VERSION = 2;
+const VERSION_KEY = 'globehop:schemaVersion';
+
+// One-time migration for the India-focused build: discard legacy trips/destinations
+// (e.g. old Seoul/KR fallbacks) so every user starts with a clean, India-first state.
+export function migrateStorage() {
+  try {
+    const previous = Number(localStorage.getItem(VERSION_KEY) || 1);
+    if (previous < SCHEMA_VERSION) {
+      localStorage.removeItem(PREFIX + 'recent');
+      localStorage.removeItem(PREFIX + 'lastDestination');
+      localStorage.setItem(VERSION_KEY, String(SCHEMA_VERSION));
+    }
+  } catch {
+    // Storage can be unavailable; the app still works fully without persistence.
+  }
+}
 
 export function getStored(key, fallback) {
   try {

@@ -18,7 +18,8 @@ const checks = [
   ['2D suppresses accidental click after pan', g2.includes('suppressClickUntil')],
   ['UI has +/- zoom controls', app.includes('mapZoomControls') && app.includes('data-zoom="in"') && app.includes('data-zoom="out"')],
   ['Build badge is V8.5', app.includes('V8.5')],
-  ['Service worker cache is V8.5', sw.includes('globehop-v8-5-korea-tourism-20260819')]
+  ['Service worker cache is India landmarks build', sw.includes('globehop-kids-india-landmarks-20261027')],
+  ['Indian landmarks dataset is precached', sw.includes('src/data/indian-landmarks/index.json')]
 ];
 
 let failed = 0;

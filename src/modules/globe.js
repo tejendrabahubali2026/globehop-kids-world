@@ -64,10 +64,14 @@ export class GlobeView {
     this.placeLayer = svgEl('g', { class: 'place-layer' });
     this.routeLayer = svgEl('g', { class: 'route-layer' });
     this.markerLayer = svgEl('g', { class: 'marker-layer' });
+    this.clusterLayer = svgEl('g', { class: 'cluster-layer' });
     this.svg.appendChild(this.landLayer);
     this.svg.appendChild(this.placeLayer);
+    this.svg.appendChild(this.clusterLayer);
     this.svg.appendChild(this.routeLayer);
     this.svg.appendChild(this.markerLayer);
+    this.clusterSignature = '';
+    this.clusterNodes = [];
   }
 
   clampViewBox(box) {
@@ -236,6 +240,7 @@ export class GlobeView {
       const p = equirectProject(place.lat, place.lon);
       const population = Number(place.population) || 0;
       const radius = place.type === 'landmark' ? 4.8 : place.type === 'capital' ? 3.2 : population >= 1000000 ? 3.4 : population >= 200000 ? 3.0 : population >= 50000 ? 2.6 : 2.25;
+      const isIndiaLandmark = Boolean(place.isIndiaLandmark);
       const g = svgEl('g', {
         class: `map-place-point map-place-${place.type || 'city'}`,
         transform: this.pointTransform(p.x, p.y),
@@ -244,11 +249,20 @@ export class GlobeView {
         'data-country': place.countryCode || '', 'data-searched': place.isSearchedPoint ? '1' : '0',
         'data-dynamic-city': place.isDynamicCity ? '1' : '0',
         'data-dynamic-landmark': place.isDynamicLandmark ? '1' : '0',
+        'data-landmark': isIndiaLandmark ? '1' : '0',
         'data-population': String(population),
         'data-rank': String(place.cityRank || 999999),
         'data-x': p.x, 'data-y': p.y
       });
-      g.appendChild(svgEl('circle', { cx: '0', cy: '0', r: String(radius), class: 'map-place-dot' }));
+      if (isIndiaLandmark) {
+        // Lightweight emoji marker with an invisible, generous hit area.
+        g.appendChild(svgEl('circle', { cx: '0', cy: '0', r: '9', class: 'landmark-hit' }));
+        const emoji = svgEl('text', { x: '0', y: '3.4', 'text-anchor': 'middle', class: 'landmark-emoji' });
+        emoji.textContent = place.emoji || '📍';
+        g.appendChild(emoji);
+      } else {
+        g.appendChild(svgEl('circle', { cx: '0', cy: '0', r: String(radius), class: 'map-place-dot' }));
+      }
       const showHover = (event) => this.onHover?.({ kind: 'place', data: place }, { clientX: event.clientX, clientY: event.clientY });
       g.addEventListener('pointerenter', showHover);
       g.addEventListener('pointermove', showHover);
@@ -286,10 +300,15 @@ export class GlobeView {
     const marginY = box.height * 0.10;
     const cityCandidates = [];
     const landmarkCandidates = [];
+    const indiaLandmarkNodes = [];
     for (const node of nodes) {
       const country = node.dataset.country;
       const relevant = !this.selectedCountry || country === this.selectedCountry || country === this.originCountry || node.dataset.searched === '1';
       node.classList.toggle('is-muted-point', !relevant);
+      if (node.dataset.landmark === '1') {
+        indiaLandmarkNodes.push(node);
+        continue;
+      }
       const dynamicCity = node.dataset.dynamicCity === '1';
       const dynamicLandmark = node.dataset.dynamicLandmark === '1';
       if (!dynamicCity && !dynamicLandmark) {
@@ -311,6 +330,115 @@ export class GlobeView {
     landmarkCandidates.sort((a, b) => Number(a.dataset.rank || 999999) - Number(b.dataset.rank || 999999));
     cityCandidates.forEach((node, index) => node.classList.toggle('is-density-hidden', index >= cityLimit));
     landmarkCandidates.forEach((node, index) => node.classList.toggle('is-density-hidden', index >= landmarkLimit));
+    this.updateLandmarkClusters(indiaLandmarkNodes);
+  }
+
+  // Grid-based clustering for the Indian landmarks dataset. Clusters are only rebuilt
+  // when the bucket layout changes; otherwise transforms are updated in place so the
+  // map stays smooth even with 170+ emoji points during pans and zooms.
+  updateLandmarkClusters(nodes) {
+    if (!this.clusterLayer) return;
+    const box = this.currentViewBox;
+    const marginX = box.width * 0.08;
+    const marginY = box.height * 0.1;
+    const landmarkRelevant = !this.selectedCountry || this.selectedCountry === 'IN' || this.originCountry === 'IN';
+    const visible = [];
+    for (const node of nodes) {
+      if (!landmarkRelevant) {
+        node.classList.add('is-density-hidden');
+        continue;
+      }
+      const x = Number(node.dataset.x);
+      const y = Number(node.dataset.y);
+      const inside = x >= box.x - marginX && x <= box.x + box.width + marginX && y >= box.y - marginY && y <= box.y + box.height + marginY;
+      if (!inside) {
+        node.classList.add('is-density-hidden');
+        continue;
+      }
+      visible.push({ node, x, y });
+    }
+    if (!visible.length) {
+      this.clusterLayer.innerHTML = '';
+      this.clusterNodes = [];
+      this.clusterSignature = '';
+      return;
+    }
+    // Close zoom: show every individual emoji marker, no clustering.
+    if (box.width <= 170) {
+      visible.forEach((v) => v.node.classList.remove('is-density-hidden'));
+      this.clusterLayer.innerHTML = '';
+      this.clusterNodes = [];
+      this.clusterSignature = '';
+      return;
+    }
+    const cell = Math.max(18, Math.min(95, box.width * 0.055));
+    const buckets = new Map();
+    for (const v of visible) {
+      const key = `${Math.floor(v.x / cell)}:${Math.floor(v.y / cell)}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(v);
+    }
+    const groups = [];
+    for (const group of buckets.values()) {
+      if (group.length === 1) {
+        group[0].node.classList.remove('is-density-hidden');
+        continue;
+      }
+      group.forEach((v) => v.node.classList.add('is-density-hidden'));
+      const cx = group.reduce((sum, v) => sum + v.x, 0) / group.length;
+      const cy = group.reduce((sum, v) => sum + v.y, 0) / group.length;
+      groups.push({ cx, cy, count: group.length });
+    }
+    const signature = `${cell.toFixed(1)}|${groups.map((g) => `${g.cx.toFixed(0)},${g.cy.toFixed(0)}:${g.count}`).join(';')}`;
+    if (signature === this.clusterSignature && this.clusterNodes.length === groups.length) {
+      this.clusterNodes.forEach((cluster, index) => {
+        const g = groups[index];
+        if (g) cluster.setAttribute('transform', this.pointTransform(g.cx, g.cy));
+      });
+      return;
+    }
+    this.clusterSignature = signature;
+    this.clusterLayer.innerHTML = '';
+    this.clusterNodes = [];
+    for (const g of groups) {
+      const node = svgEl('g', {
+        class: 'map-landmark-cluster',
+        transform: this.pointTransform(g.cx, g.cy),
+        role: 'button',
+        tabindex: '0',
+        'aria-label': `${g.count} landmarks`
+      });
+      node.appendChild(svgEl('circle', { cx: '0', cy: '0', r: '10', class: 'cluster-circle' }));
+      const label = svgEl('text', { x: '0', y: '3.6', 'text-anchor': 'middle', class: 'cluster-count' });
+      label.textContent = String(g.count);
+      node.appendChild(label);
+      const activate = (event) => {
+        event?.stopPropagation?.();
+        this.zoomToWorldPoint(g.cx, g.cy, 2.1);
+      };
+      node.addEventListener('click', activate);
+      node.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          activate(event);
+        }
+      });
+      this.clusterLayer.appendChild(node);
+      this.clusterNodes.push(node);
+    }
+  }
+
+  zoomToWorldPoint(x, y, factor = 2) {
+    const newWidth = Math.max(34, this.currentViewBox.width / factor);
+    const next = this.clampViewBox({ x: x - newWidth / 2, y: y - newWidth / 4, width: newWidth, height: newWidth / 2 });
+    this.animateViewBox(next, 560);
+  }
+
+  focusPoint(lat, lon, { width = 120 } = {}) {
+    const p = equirectProject(lat, lon);
+    const w = Math.max(46, Math.min(420, width));
+    this.svg.classList.add('is-zoomed');
+    this.animateViewBox({ x: p.x - w / 2, y: p.y - w / 4, width: w, height: w / 2 }, 760);
   }
 
   highlightCountry(code2) {

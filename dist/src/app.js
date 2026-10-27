@@ -1,10 +1,10 @@
 import { APP } from './modules/config.js';
 import { translator, localeLabel } from './modules/i18n.js';
-import { getStored, setStored, pushRecent, toggleFavorite } from './modules/storage.js';
+import { getStored, setStored, pushRecent, toggleFavorite, migrateStorage } from './modules/storage.js';
 import { haversineKm, estimateLandRoute, estimateFlightTimeHours, timeDifferenceHours } from './modules/geo.js';
 import {
   displayCountryName, fetchRoadRoute, fetchWorldBankStats, getCountry, getCountryCitySuggestions, getFlagEmoji,
-  getKoreaTourismAttractions, loadCountryIndex, loadKnowledge, loadOrigins, loadPlaces, loadWorldGeometries,
+  getKoreaTourismAttractions, loadCountryIndex, loadIndianLandmarks, loadKnowledge, loadOrigins, loadPlaces, loadWorldGeometries,
   resolveCityLocation, searchLocal, searchOnlinePlaces
 } from './modules/dataService.js';
 import { GlobeView } from './modules/globe.js';
@@ -17,6 +17,9 @@ const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const escapeHtml = (value = '') => String(value).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 
 const requestedViewMode = new URLSearchParams(location.search).get('view');
+
+// Clear legacy trips/destinations (old Seoul/KR fallbacks) before any state reads.
+migrateStorage();
 
 const initialLocale = (() => {
   const stored = getStored('locale', null);
@@ -39,6 +42,9 @@ const state = {
   places: [],
   mapPoints: [],
   origins: [],
+  indianLandmarks: [],
+  indiaState: '',
+  indiaPanelOpen: true,
   roadRoute: null,
   searchTimer: null,
   searchAbort: null,
@@ -105,6 +111,21 @@ function renderAppShell() {
           </div>
           <div class="search-hint" id="searchHint"></div>
           <div class="search-results" id="searchResults" role="listbox" hidden></div>
+        </div>
+      </section>
+
+      <section class="explore-india" aria-labelledby="exploreIndiaTitle">
+        <div class="explore-india-head">
+          <h2 id="exploreIndiaTitle"><span aria-hidden="true">🇮🇳</span> <span data-i18n="exploreIndia"></span></h2>
+          <button class="ghost-button explore-toggle" id="exploreIndiaToggle" type="button" aria-expanded="true" aria-controls="exploreIndiaBody"></button>
+        </div>
+        <div class="explore-india-body" id="exploreIndiaBody">
+          <p class="explore-india-hint" data-i18n="exploreIndiaHint"></p>
+          <div class="explore-india-controls">
+            <select id="indiaStateSelect" aria-label="Indian state or union territory"></select>
+            <span class="explore-india-count" id="indiaLandmarkCount"></span>
+          </div>
+          <div class="explore-india-list" id="indiaLandmarkList" role="list"></div>
         </div>
       </section>
 
@@ -245,6 +266,11 @@ function renderAppShell() {
       </div>
     </footer>
 
+    <dialog id="landmarkDialog" class="landmark-dialog">
+      <button class="dialog-close icon-button" type="button" data-landmark-close aria-label="Close">${icon('close')}</button>
+      <div id="landmarkCardContent"></div>
+    </dialog>
+
     <dialog id="sourceDialog" class="source-dialog">
       <button class="dialog-close icon-button" type="button" data-dialog-close aria-label="Close">${icon('close')}</button>
       <div class="dialog-globe" aria-hidden="true">🌍</div>
@@ -306,6 +332,7 @@ function applyTranslations() {
   renderThemeButton();
   updateViewControls();
   globe3D?.setHelpText(t('globeInteractionHint'));
+  renderExploreIndia();
   renderCurrentSelection();
   renderRecent();
 }
@@ -455,11 +482,13 @@ function updateInteractiveRoute({ focus3D = true } = {}) {
 function mapItemName(item) {
   if (!item?.data) return '';
   if (item.kind === 'country') return displayCountryName(item.data.code2, state.locale, item.data.name || item.data.code2);
+  if (item.data.isIndiaLandmark) return `${item.data.emoji || '📍'} ${item.data.name}`;
   return item.data.name || item.data.nameKo || item.data.id;
 }
 
 function mapItemSecondary(item) {
   if (!item?.data) return '';
+  if (item.data.isIndiaLandmark) return `${item.data.state} · ${t('landmarkBadge')}`;
   if (item.kind === 'country') {
     const capital = item.data.capital ? `${t('capital')}: ${item.data.capital}` : '';
     return [capital, displayRegion(item.data.region)].filter(Boolean).join(' · ');
@@ -485,7 +514,7 @@ function showMapTooltip(item, position) {
   }
   const population = item.data.population ? `<span>👥 ${escapeHtml(formatCompact(item.data.population))}</span>` : '';
   const area = item.data.areaKm2 ? `<span>📐 ${escapeHtml(formatNumber(Math.round(item.data.areaKm2)))} km²</span>` : '';
-  const description = item.data.description || '';
+  const description = item.data.isIndiaLandmark ? (item.data.landmark?.funFact || '') : (item.data.description || '');
   tooltip.innerHTML = `
     <strong>${escapeHtml(mapItemName(item))}</strong>
     <small>${escapeHtml(mapItemSecondary(item))}</small>
@@ -509,6 +538,12 @@ function hideMapTooltip() {
 
 function travelToInteractiveItem(item) {
   if (!item?.data) return;
+  if (item.data.isIndiaLandmark) {
+    const landmark = item.data.landmark || item.data;
+    openLandmarkCard(landmark);
+    flyToLandmark(landmark);
+    return;
+  }
   if (item.kind === 'country') {
     const country = item.data;
     selectResult({ kind: 'country', ...country, code2: country.code2, displayName: displayCountryName(country.code2, state.locale, country.name || country.code2) });
@@ -516,6 +551,111 @@ function travelToInteractiveItem(item) {
   }
   const place = item.data;
   selectResult({ kind: 'place', ...place, countryCode: place.countryCode || place.code2 });
+}
+
+function landmarkToMapPoint(lm) {
+  return {
+    id: `il-${lm.id}`,
+    name: lm.name,
+    nameHi: lm.nameHi,
+    type: 'india-landmark',
+    isIndiaLandmark: true,
+    countryCode: 'IN',
+    lat: lm.lat,
+    lon: lm.lon,
+    emoji: lm.emoji,
+    state: lm.state,
+    landmark: lm
+  };
+}
+
+function flyToLandmark(lm) {
+  if (!lm) return;
+  globe2D?.highlightCountry('IN');
+  globe2D?.focusPoint(lm.lat, lm.lon);
+  globe3D?.setSelectedCountry('IN');
+  if (state.viewMode === 'globe') {
+    const active3D = globe3D || ensureGlobe3D();
+    active3D?.setSelectedCountry('IN');
+    active3D?.focusPoint(lm.lat, lm.lon, { zoom: 1.5 });
+  }
+}
+
+function openLandmarkCard(lm) {
+  const dialog = $('#landmarkDialog');
+  const root = $('#landmarkCardContent');
+  if (!dialog || !root || !lm) return;
+  root.innerHTML = `
+    <div class="landmark-hero">
+      <span class="landmark-emoji-big" aria-hidden="true">${escapeHtml(lm.emoji || '📍')}</span>
+      <div>
+        <span class="eyebrow">${escapeHtml(t('landmarkBadge'))}</span>
+        <h2>${escapeHtml(lm.name)}</h2>
+        <h3>${escapeHtml(lm.nameHi)}</h3>
+      </div>
+    </div>
+    <div class="landmark-state-chips">
+      <span class="data-badge">📍 ${escapeHtml(lm.state)}</span>
+      <span class="data-badge">${escapeHtml(lm.stateHi)}</span>
+      <span class="data-badge">📍 ${escapeHtml(Number(lm.lat).toFixed(3))}, ${escapeHtml(Number(lm.lon).toFixed(3))}</span>
+    </div>
+    <div class="landmark-facts">
+      <article class="landmark-fact">
+        <h4>${escapeHtml(t('funFact'))} <small>English</small></h4>
+        <p>${escapeHtml(lm.funFact)}</p>
+      </article>
+      <article class="landmark-fact landmark-fact-hi">
+        <h4>${escapeHtml(t('funFact'))} <small>हिन्दी</small></h4>
+        <p>${escapeHtml(lm.funFactHi)}</p>
+      </article>
+    </div>
+    <div class="landmark-actions">
+      <button class="primary-button" type="button" data-landmark-fly>${icon('location', 17)}<span>${escapeHtml(t('flyHere'))}</span></button>
+      <button class="secondary-button" type="button" data-landmark-close>${escapeHtml(t('close'))}</button>
+    </div>`;
+  root.querySelector('[data-landmark-fly]')?.addEventListener('click', () => flyToLandmark(lm));
+  if (!dialog.open) dialog.showModal();
+}
+
+function renderExploreIndia() {
+  const select = $('#indiaStateSelect');
+  const list = $('#indiaLandmarkList');
+  const count = $('#indiaLandmarkCount');
+  const toggle = $('#exploreIndiaToggle');
+  if (!select || !state.indianLandmarks.length) return;
+  const stateNames = [...new Set(state.indianLandmarks.map((lm) => lm.state))].sort((a, b) => a.localeCompare(b));
+  select.innerHTML = `<option value="">${escapeHtml(t('pickState'))}</option>${stateNames
+    .map((name) => {
+      const n = state.indianLandmarks.filter((lm) => lm.state === name).length;
+      return `<option value="${escapeHtml(name)}"${name === state.indiaState ? ' selected' : ''}>${escapeHtml(name)} (${n})</option>`;
+    })
+    .join('')}`;
+  if (toggle) {
+    toggle.textContent = state.indiaPanelOpen ? t('hidePanel') : t('showPanel');
+    toggle.setAttribute('aria-expanded', String(state.indiaPanelOpen));
+  }
+  const body = $('#exploreIndiaBody');
+  if (body) body.hidden = !state.indiaPanelOpen;
+  if (count) count.textContent = state.indiaState ? `${state.indianLandmarks.filter((lm) => lm.state === state.indiaState).length} ${t('landmarks')}` : '';
+  if (!list) return;
+  if (!state.indiaState) {
+    list.innerHTML = `<p class="explore-empty">${escapeHtml(t('exploreIndiaHint'))}</p>`;
+    return;
+  }
+  const items = state.indianLandmarks.filter((lm) => lm.state === state.indiaState);
+  list.innerHTML = items
+    .map((lm) => `
+      <button type="button" class="india-landmark-chip" role="listitem" data-landmark-id="${escapeHtml(lm.id)}">
+        <span class="chip-emoji" aria-hidden="true">${escapeHtml(lm.emoji || '📍')}</span>
+        <span class="chip-copy"><strong>${escapeHtml(lm.name)}</strong><small>${escapeHtml(lm.nameHi)}</small></span>
+      </button>`)
+    .join('');
+  $$('.india-landmark-chip', list).forEach((button) => button.addEventListener('click', () => {
+    const lm = state.indianLandmarks.find((item) => item.id === button.dataset.landmarkId);
+    if (!lm) return;
+    openLandmarkCard(lm);
+    flyToLandmark(lm);
+  }));
 }
 
 function buildInteractiveMapPoints(countries, places) {
@@ -1240,7 +1380,7 @@ async function doSearch() {
   }
 }
 
-async function selectResult(result, { skipUrl = false, urlMode = 'push' } = {}) {
+async function selectResult(result, { skipUrl = false, urlMode = 'push', skipRecent = false } = {}) {
   if (!result) return;
   $('#searchResults').hidden = true;
   $('#searchInput').value = '';
@@ -1364,8 +1504,10 @@ async function selectResult(result, { skipUrl = false, urlMode = 'push' } = {}) 
   else if (isCityDestination()) hydrateCityInsights();
   resolveRoadRoute();
   const recentItem = { key: state.destination.key, name: state.destination.name, nameKo: state.destination.nameKo, countryCode: code2, kind: state.destination.kind, lat: state.destination.lat, lon: state.destination.lon, timezone: state.destination.timezone, rawName: state.destination.rawName, admin1: state.destination.admin1, admin2: state.destination.admin2, population: state.destination.population, elevation: state.destination.elevation, geonameId: state.destination.geonameId };
-  pushRecent(recentItem, APP.maxRecent);
-  setStored('lastDestination', recentItem);
+  if (!skipRecent) {
+    pushRecent(recentItem, APP.maxRecent);
+    setStored('lastDestination', recentItem);
+  }
   renderRecent();
   updateDetailNavigation();
   if (!skipUrl) updateUrl(urlMode);
@@ -1537,6 +1679,20 @@ function wireEvents() {
   $('#infoButton').addEventListener('click', open);
   $('#footerInfo').addEventListener('click', open);
   $$('[data-dialog-close]').forEach((b) => b.addEventListener('click', () => dialog.close()));
+
+  // Explore India panel
+  $('#indiaStateSelect').addEventListener('change', (event) => {
+    state.indiaState = event.target.value;
+    renderExploreIndia();
+  });
+  $('#exploreIndiaToggle').addEventListener('click', () => {
+    state.indiaPanelOpen = !state.indiaPanelOpen;
+    renderExploreIndia();
+  });
+  const landmarkDialog = $('#landmarkDialog');
+  landmarkDialog.addEventListener('click', (event) => {
+    if (event.target.closest('[data-landmark-close]')) landmarkDialog.close();
+  });
 }
 
 async function loadSelectionFromLocation() {
@@ -1584,7 +1740,7 @@ async function loadInitialSelection() {
     }
   }
   const india = state.countryIndex.find((row) => row.code2 === APP.defaultCountryCode);
-  await selectResult({ kind: 'country', ...india, displayName: displayCountryName(APP.defaultCountryCode, state.locale, india?.name || 'India') }, { skipUrl: true });
+  await selectResult({ kind: 'country', ...india, displayName: displayCountryName(APP.defaultCountryCode, state.locale, india?.name || 'India') }, { skipUrl: true, skipRecent: true });
   updateUrl('replace');
 }
 
@@ -1592,14 +1748,19 @@ async function init() {
   renderAppShell();
   renderLanguageSelect();
   setTheme(state.theme);
-  const [geoms, index, places, origins] = await Promise.all([loadWorldGeometries(), loadCountryIndex(), loadPlaces(), loadOrigins()]);
+  const [geoms, index, places, origins, indianLandmarks] = await Promise.all([
+    loadWorldGeometries(), loadCountryIndex(), loadPlaces(), loadOrigins(),
+    loadIndianLandmarks().catch(() => [])
+  ]);
   state.countryIndex = index;
   state.places = places;
-  state.mapPoints = buildInteractiveMapPoints(index, places);
+  state.indianLandmarks = indianLandmarks;
+  state.mapPoints = [...buildInteractiveMapPoints(index, places), ...indianLandmarks.map(landmarkToMapPoint)];
   state.origins = origins;
   const initialOrigin = originPresetById(state.originPreset);
   setOriginObject(initialOrigin);
   applyTranslations();
+  renderExploreIndia();
   wireEvents();
   updateViewControls();
   globe2D = new GlobeView($('#globeSvg'), {

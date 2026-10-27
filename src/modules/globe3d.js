@@ -881,7 +881,7 @@ export class Globe3DView {
         const selected = place.countryCode === this.selectedCountry;
         const routeOrigin = place.countryCode && place.countryCode === routeOriginCode;
         if (place.isSearchedPoint) return true;
-        if (place.type === 'landmark') return selected;
+        if (place.type === 'landmark' || place.type === 'india-landmark') return selected;
         if (place.type === 'city' || place.type === 'capital') return selected || routeOrigin;
         return false;
       })
@@ -890,7 +890,7 @@ export class Globe3DView {
           if (place.isSearchedPoint) return 0;
           if (place.isKoreaTourismPoint && place.countryCode === this.selectedCountry) return 1;
           if (place.countryCode === routeDestinationCode && place.type === 'landmark') return 2;
-          if (place.countryCode === this.selectedCountry && place.type === 'landmark') return 3;
+          if (place.countryCode === this.selectedCountry && (place.type === 'landmark' || place.type === 'india-landmark')) return 3;
           if (place.countryCode === this.selectedCountry && place.type === 'capital') return 4;
           if (place.countryCode === this.selectedCountry && place.type === 'city') return 5;
           if (place.countryCode === routeOriginCode && place.type === 'city') return 6;
@@ -917,16 +917,16 @@ export class Globe3DView {
       const maxOrigin = this.distance < 1.8 ? 8 : this.distance < 2.5 ? 5 : 3;
       const maxSelectedLandmarks = this.distance < 1.5 ? 52 : this.distance < 1.8 ? 36 : this.distance < 2.2 ? 22 : this.distance < 2.8 ? 14 : 8;
       if (selected && selectedShown >= maxSelected) continue;
-      if (selected && place.type === 'landmark' && selectedLandmarksShown >= maxSelectedLandmarks) continue;
+      if (selected && (place.type === 'landmark' || place.type === 'india-landmark') && selectedLandmarksShown >= maxSelectedLandmarks) continue;
       if (routeOrigin && originShown >= maxOrigin) continue;
-      const color = place.type === 'landmark' ? '#ffc24b' : place.type === 'capital' ? '#b3ee72' : '#6fd8ff';
+      const color = place.type === 'india-landmark' ? '#ff8a3d' : place.type === 'landmark' ? '#ffc24b' : place.type === 'capital' ? '#b3ee72' : '#6fd8ff';
       const population = Number(place.population) || 0;
-      const size = place.type === 'landmark' ? 4.4 : place.type === 'capital' ? 3.4 : population >= 1000000 ? 3.5 : population >= 200000 ? 3.0 : population >= 50000 ? 2.55 : 2.25;
+      const size = place.type === 'landmark' || place.type === 'india-landmark' ? 4.4 : place.type === 'capital' ? 3.4 : population >= 1000000 ? 3.5 : population >= 200000 ? 3.0 : population >= 50000 ? 2.55 : 2.25;
       const drawn = drawMarker(place, color, size);
       if (!drawn) continue;
       if (selected) {
         selectedShown += 1;
-        if (place.type === 'landmark') selectedLandmarksShown += 1;
+        if (place.type === 'landmark' || place.type === 'india-landmark') selectedLandmarksShown += 1;
       }
       if (routeOrigin) originShown += 1;
     }
