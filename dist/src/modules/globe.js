@@ -240,7 +240,7 @@ export class GlobeView {
         class: `map-place-point map-place-${place.type || 'city'}`,
         transform: this.pointTransform(p.x, p.y),
         tabindex: place.isCapitalPoint ? '-1' : '0', role: 'button',
-        'aria-label': place.nameKo || place.name || place.id,
+        'aria-label': place.name || place.nameKo || place.id,
         'data-country': place.countryCode || '', 'data-searched': place.isSearchedPoint ? '1' : '0',
         'data-dynamic-city': place.isDynamicCity ? '1' : '0',
         'data-dynamic-landmark': place.isDynamicLandmark ? '1' : '0',

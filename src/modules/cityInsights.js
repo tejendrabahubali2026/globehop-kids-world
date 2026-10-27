@@ -3,7 +3,7 @@ import { displayCountryName, getCountryCitySuggestions, getKoreaTourismCity, res
 import { resolveWikipediaImages } from './wikiMedia.js';
 
 const WIKI_LOCALE = {
-  ko: 'ko', en: 'en', zh: 'zh', hi: 'hi', es: 'es', ar: 'ar', bn: 'bn', pt: 'pt', ru: 'ru', ja: 'ja', de: 'de', fr: 'fr', id: 'id', ur: 'ur', tr: 'tr', vi: 'vi', it: 'it', th: 'th', fa: 'fa', fil: 'en'
+  en: 'en', hi: 'hi', bn: 'bn', ur: 'ur', mr: 'mr', te: 'te', ta: 'ta', gu: 'gu'
 };
 
 function wikiLanguage(locale) {
@@ -246,14 +246,7 @@ async function fetchNearbyWikipedia(location, locale) {
     .map((page) => ({ ...page, language: lang }));
 }
 
-export function weatherCodeLabel(code, locale = 'en') {
-  const ko = {
-    0: '맑음', 1: '대체로 맑음', 2: '부분적으로 흐림', 3: '흐림', 45: '안개', 48: '서리 안개',
-    51: '약한 이슬비', 53: '이슬비', 55: '강한 이슬비', 56: '약한 어는 이슬비', 57: '강한 어는 이슬비',
-    61: '약한 비', 63: '비', 65: '강한 비', 66: '약한 어는 비', 67: '강한 어는 비',
-    71: '약한 눈', 73: '눈', 75: '강한 눈', 77: '싸락눈', 80: '약한 소나기', 81: '소나기', 82: '강한 소나기',
-    85: '약한 눈 소나기', 86: '강한 눈 소나기', 95: '뇌우', 96: '우박을 동반한 뇌우', 99: '강한 우박을 동반한 뇌우'
-  };
+export function weatherCodeLabel(code) {
   const en = {
     0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Rime fog',
     51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle', 56: 'Light freezing drizzle', 57: 'Heavy freezing drizzle',
@@ -261,15 +254,13 @@ export function weatherCodeLabel(code, locale = 'en') {
     71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow grains', 80: 'Light showers', 81: 'Showers', 82: 'Heavy showers',
     85: 'Light snow showers', 86: 'Heavy snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Severe thunderstorm with hail'
   };
-  return (locale === 'ko' ? ko : en)[Number(code)] || (locale === 'ko' ? '날씨 정보' : 'Weather');
+  return en[Number(code)] || 'Weather';
 }
 
-export function aqiLabel(aqi, locale = 'en') {
+export function aqiLabel(aqi) {
   const n = Number(aqi);
   if (!Number.isFinite(n)) return '';
-  const labels = locale === 'ko'
-    ? ['좋음', '보통', '민감군에 나쁨', '나쁨', '매우 나쁨', '위험']
-    : ['Good', 'Moderate', 'Unhealthy for sensitive groups', 'Unhealthy', 'Very unhealthy', 'Hazardous'];
+  const labels = ['Good', 'Moderate', 'Unhealthy for sensitive groups', 'Unhealthy', 'Very unhealthy', 'Hazardous'];
   if (n <= 50) return labels[0];
   if (n <= 100) return labels[1];
   if (n <= 150) return labels[2];

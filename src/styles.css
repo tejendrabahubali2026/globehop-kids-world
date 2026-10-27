@@ -21,7 +21,7 @@
   --radius-sm: 12px;
   --radius-md: 18px;
   --radius-lg: 28px;
-  font-family: ui-rounded, "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", system-ui, sans-serif;
+  font-family: ui-rounded, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Gujarati", "Noto Nastaliq Urdu", "Segoe UI", system-ui, sans-serif;
 }
 
 :root[data-theme="dark"] {
@@ -267,7 +267,15 @@ button:disabled { opacity: .55; cursor: wait; }
 .history-item strong { margin-top: 4px; font-size: 11px; }
 .history-item small { color: var(--muted); font-size: 9px; }
 .history-empty { color: var(--muted); font-size: 12px; }
-.site-footer { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; padding: 24px 20px 38px; color: var(--muted); font-size: 11px; }
+.site-footer { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; padding: 24px 20px 38px; color: var(--muted); font-size: 11px; }
+.site-footer-meta { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dev-credit-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; max-width: min(960px, 100%); padding: 10px 18px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); font-size: 12px; font-weight: 600; line-height: 1.6; box-shadow: var(--shadow-sm); }
+.dev-credit-bar a { color: var(--primary-strong); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.dev-credit-bar a:hover { text-decoration: none; }
+@media (max-width: 640px) {
+  .dev-credit-bar { flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; font-size: 11px; text-align: center; }
+  .dev-credit-bar [aria-hidden="true"] { display: none; }
+}
 .text-button { border: 0; background: transparent; color: var(--primary); text-decoration: underline; cursor: pointer; padding: 4px; }
 
 .source-dialog { width: min(520px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); padding: 28px; box-shadow: var(--shadow-md); }

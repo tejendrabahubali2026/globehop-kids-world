@@ -232,8 +232,9 @@ export class Globe3DView {
     this.flightStart = 0;
     this.flightDuration = 4600;
     this.tripType = 'oneway';
-    this.yaw = -20 * RAD;
-    this.pitch = 18 * RAD;
+    // Default camera faces New Delhi, India (28.6139°N, 77.2090°E).
+    this.yaw = -77.209 * RAD;
+    this.pitch = 28.6139 * RAD;
     this.distance = 3.1;
     this.targetYaw = this.yaw;
     this.targetPitch = this.pitch;
@@ -506,11 +507,11 @@ export class Globe3DView {
       this.focusRoute(this.route.originData, this.route.destinationData);
       return;
     }
-    this.animateCameraTo(-20 * RAD, 18 * RAD, 3.15, 850);
+    this.animateCameraTo(-77.209 * RAD, 28.6139 * RAD, 3.15, 850);
   }
 
   worldView() {
-    this.animateCameraTo(-20 * RAD, 18 * RAD, 3.85, 900);
+    this.animateCameraTo(-77.209 * RAD, 28.6139 * RAD, 3.85, 900);
   }
 
   zoomBy(factor = 1.15) {
@@ -937,7 +938,7 @@ export class Globe3DView {
       const destinationCountry = this.countryByCode.get(this.route.destinationData.countryCode);
       const originCountryLabel = this.route.originData.countryLabel || originCountry?.nativeName || originCountry?.name || this.route.originData.countryCode;
       const destinationCountryLabel = this.route.destinationData.countryLabel || (this.route.destinationData.kind === 'country' ? this.route.destinationData.name : '') || destinationCountry?.nativeName || destinationCountry?.name || this.route.destinationData.countryCode;
-      drawCountryContextLabel(this.route.originData.countryCode, originCountryLabel, this.route.originData.displayLabel || this.route.originData.nameKo || this.route.originData.name || '', '#4cc8ff', -1);
+      drawCountryContextLabel(this.route.originData.countryCode, originCountryLabel, this.route.originData.displayLabel || this.route.originData.name || this.route.originData.nameKo || '', '#4cc8ff', -1);
       if (this.route.destinationData.countryCode !== this.route.originData.countryCode) {
         drawCountryContextLabel(this.route.destinationData.countryCode, destinationCountryLabel, this.route.destinationData.displayLabel || this.route.destinationData.name || '', '#ffbf4c', 1);
       }
@@ -973,7 +974,7 @@ export class Globe3DView {
       }
       if (originProjection?.front) {
         drawMarker(this.route.originData, '#45a5ff', 6.5, false);
-        drawRouteLabel(originProjection, this.route.originData.displayLabel || this.route.originData.nameKo || this.route.originData.name || 'Start', '#45a5ff', 'below');
+        drawRouteLabel(originProjection, this.route.originData.displayLabel || this.route.originData.name || this.route.originData.nameKo || 'Start', '#45a5ff', 'below');
       }
       if (destinationProjection?.front) {
         drawMarker(this.route.destinationData, '#ff6f61', 7, false);
